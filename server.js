@@ -8,16 +8,24 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static('public'));
 app.use(express.json());
 
+
+// Environment variables with sensible defaults
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'Chris';
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'http://host.docker.internal:8000/1';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const MCP_SERVICE_NAMES = (process.env.MCP_SERVICE_NAMES || 'vehicles').split(',').map(s => s.trim()).filter(Boolean);
+const MCP_BASE_URL = process.env.MCP_BASE_URL || 'http://host.docker.internal:8000';
+
 // Create OpenAI provider
 const openai = llmOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'Chris',
-  baseURL: 'http://host.docker.internal:8000/1',
-  model: 'gpt-4.1-mini',
+  apiKey: OPENAI_API_KEY,
+  baseURL: OPENAI_BASE_URL,
+  model: OPENAI_MODEL,
 });
 
 // MCP services
-const mcps = ['vehicles'].map(name =>
-  mcp(`http://host.docker.internal:8000/${name}`)
+const mcps = MCP_SERVICE_NAMES.map(name =>
+  mcp(`${MCP_BASE_URL}/${name}`)
 );
 
 async function runAgent(messages, useMcp = false) {
@@ -61,6 +69,13 @@ app.post('/api/chat', async (req, res) => {
     if (err.status === 429 || err.cause?.status === 429) {
       return res.status(429).json({
         error: 'Rate limit has been hit. Please wait a few seconds and try again.',
+      });
+    }
+    
+    // Detect 400 bad request (prompt guard, content filter, etc.)
+    if (err.status === 400 || err.cause?.status === 400) {
+      return res.status(400).json({
+        error: 'Your message was blocked by content filters. Please rephrase your request.',
       });
     }
     

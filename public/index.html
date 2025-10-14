@@ -114,64 +114,14 @@
       border-bottom-left-radius: 4px;
     }
 
-/* Make markdown tables scroll horizontally if too wide */
-.message.ai table {
-  display: block;
-  width: 100%;
-  overflow-x: auto;
-  border-collapse: collapse;
-}
-
-.message.ai th,
-.message.ai td {
-  padding: 6px 8px;
-  border: 1px solid #ccc;
-  text-align: left;
-  white-space: nowrap; /* prevent text wrapping inside cells */
-}
-
-.message.ai table::-webkit-scrollbar {
-  height: 6px;
-}
-.message.ai table::-webkit-scrollbar-thumb {
-  background: #bbb;
-  border-radius: 3px;
-}
-
-
-    /* Inline code */
-.message code {
-  background: rgba(0,0,0,0.05); /* light grey background */
-  color: inherit;               /* match surrounding text color */
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-/* Code blocks */
-.message pre {
-  background: #f5f5f5;          /* light background */
-  color: #333;                  /* dark text */
-  padding: 8px;
-  border-radius: 6px;
-  overflow-x: auto;
-}
-
-.message pre code {
-  background: none;             /* remove double background */
-  color: inherit;
-}
-
     /* Markdown styling for AI messages */
-    .message.ai h1,
-    .message.ai h2,
-    .message.ai h3 {
+    .message.ai h1, .message.ai h2, .message.ai h3 {
       margin: 0.5em 0;
     }
 
     .message.ai pre {
-      background: #272822;
-      color: #f8f8f2;
+      background: rgba(0,0,0,0.05);
+      color: #333;
       padding: 0.5em;
       border-radius: 4px;
       overflow-x: auto;
@@ -184,6 +134,34 @@
       font-family: monospace;
     }
 
+    .message.ai pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .message.ai table {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      border-collapse: collapse;
+    }
+
+    .message.ai th, .message.ai td {
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .message.ai table::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .message.ai table::-webkit-scrollbar-thumb {
+      background: #bbb;
+      border-radius: 3px;
+    }
+
     .message.ai a {
       color: #0366d6;
       text-decoration: none;
@@ -193,23 +171,12 @@
       text-decoration: underline;
     }
 
-    .message.ai ul {
-      list-style-type: disc;
+    .message.ai ul, .message.ai ol {
       margin: 0.5em 0;
       padding-left: 1.5em;
     }
 
-    .message.ai ul li {
-      margin-bottom: 0.25em;
-    }
-
-    .message.ai ol {
-      list-style-type: decimal;
-      margin: 0.5em 0;
-      padding-left: 1.5em;
-    }
-
-    .message.ai ol li {
+    .message.ai li {
       margin-bottom: 0.25em;
     }
 
@@ -241,6 +208,7 @@
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
 </head>
 <body>
   <div class="chat-container">
@@ -268,7 +236,7 @@
     });
 
     let typingDiv = null;
-    let typingInterval = null;
+    
     function showTypingIndicator() {
       typingDiv = document.createElement('div');
       typingDiv.classList.add('message', 'ai');
@@ -311,16 +279,14 @@
 
         const data = await res.json();
         removeTypingIndicator();
-        //const elapsed = ((performance.now() - start) / 1000).toFixed(1); // seconds with 1 decimal
-
         const llmElapsed = ((performance.now() - start) / 1000).toFixed(1);
+        
         if (data.error) {
           appendMessage('Agent', data.error, 'ai');
         } else {
           const reply = data.response || '(no response)';
           conversation.push({ role: 'assistant', content: reply });
-         // appendMessage(`Agent (${elapsed}s)`, reply, 'ai');  
-        streamMarkdownMessage('Agent', reply, 'ai', llmElapsed);
+          streamMarkdownMessage('Agent', reply, 'ai', llmElapsed);
         }
       } catch (err) {
         removeTypingIndicator();
@@ -330,12 +296,23 @@
       }
     }
 
+    function renderContent(content) {
+      // Simple heuristic: if it contains HTML tags, treat as HTML, otherwise as Markdown
+      const hasHtmlTags = /<[^>]+>/.test(content);
+      
+      if (hasHtmlTags) {
+        return DOMPurify.sanitize(content);
+      } else {
+        return DOMPurify.sanitize(marked.parse(content));
+      }
+    }
+
     function appendMessage(who, msg, cls) {
       const div = document.createElement('div');
       div.classList.add('message', cls);
 
       const header = `<strong>${who}:</strong> `;
-      const body = marked.parse(msg);
+      const body = renderContent(msg);
 
       const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       div.innerHTML = header + body + `<div style="font-size:0.75em;color:#888;">${time}</div>`;
@@ -366,16 +343,14 @@ function streamMarkdownMessage(baseWho, msg, cls, llmElapsed) {
   function typeWord() {
     if (i < words.length) {
       const partial = words.slice(0, i + 1).join(' ');
-      target.innerHTML = marked.parse(partial);
+      target.innerHTML = renderContent(partial);
       i++;
       chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
       setTimeout(typeWord, delay);
     } else {
-      const body = marked.parse(msg);
+      const body = renderContent(msg);
       const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      //div.innerHTML = `<strong>${baseWho} (${llmElapsed}s):</strong> ${body}<div style="font-size:0.75em;color:#888;">${time}</div>`;
       div.innerHTML = `<strong>${baseWho}:</strong> ${body}<div style="font-size:0.75em;color:#888;">${time}</div>`;
-
     }
   }
 
@@ -385,16 +360,13 @@ function streamMarkdownMessage(baseWho, msg, cls, llmElapsed) {
 
 
 async function sendHiddenMessage(prompt = 'hello') {
-  // Prime conversation without showing the user message
-  //conversation.push({ role: 'user', content: prompt });
-  
-  toggleInput(false); // 🔒 disable input while waiting
+  toggleInput(false);
   const start = performance.now();
 
-      const hiddenMessages = [
-      conversation[0], // system
-       { role: 'user', content: prompt }
-       ];
+  const hiddenMessages = [
+    { role: 'system', content: 'You are a helpful assistant respond with useful markdown' },
+    { role: 'user', content: prompt }
+  ];
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -405,17 +377,16 @@ async function sendHiddenMessage(prompt = 'hello') {
     const data = await res.json();
     const llmElapsed = ((performance.now() - start) / 1000).toFixed(1);
 
-   if (data.error) {
-      streamMarkdownMessage('Agent', data.error, 'ai', '—');
+    if (data.error) {
+      streamMarkdownMessage('Agent', data.error, 'ai', llmElapsed);
     } else {
       const reply = data.response || '(no response)';
-     // conversation.push({ role: 'assistant', content: reply });
       streamMarkdownMessage('Agent', reply, 'ai', llmElapsed);
     }
   } catch (err) {
     streamMarkdownMessage('Agent', 'Error contacting server.', 'ai', '—');
   } finally {
-    toggleInput(true); // 🔓 re‑enable input once reply arrives
+    toggleInput(true);
   }
 }
 
