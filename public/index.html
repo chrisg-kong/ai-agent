@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Agent</title>
+  <style>
+    :root {
+      --bg-page: #f5f5f5;
+      --bg-header: #000000;
+      --bg-user: #4371aeff;  
+      --bg-ai: #eaeaea;
+      --text-user: #ffffff;
+      --text-ai: #333333;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-page);
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 600px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-radius: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      background: var(--bg-header);
+      color: #9cc8ffff;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-align: center;      
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 1.5rem;
+    }
+
+    .chat-header img.logo {
+      height: 32px;
+      margin-right: 0.75rem;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    .chat-input {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+
+    .chat-input input {
+      flex: 1;
+      border: none;
+      padding: 1rem;
+      font-size: 1rem;
+    }
+
+    .chat-input button {
+      border: none;
+      background: var(--bg-user);
+      color: var(--text-user);
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .chat-input input:focus,
+    .chat-input button:focus {
+      outline: none;
+    }
+
+    .message {
+      margin-bottom: 1rem;
+      max-width: 80%;
+      padding: 0.75rem 1rem;
+      border-radius: 16px;
+      word-wrap: break-word;
+    }
+
+    .message.user {
+      background: var(--bg-user);
+      color: var(--text-user);
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.ai {
+      background: var(--bg-ai);
+      color: var(--text-ai);
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+
+/* Make markdown tables scroll horizontally if too wide */
+.message.ai table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.message.ai th,
+.message.ai td {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  text-align: left;
+  white-space: nowrap; /* prevent text wrapping inside cells */
+}
+
+.message.ai table::-webkit-scrollbar {
+  height: 6px;
+}
+.message.ai table::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 3px;
+}
+
+
+    /* Inline code */
+.message code {
+  background: rgba(0,0,0,0.05); /* light grey background */
+  color: inherit;               /* match surrounding text color */
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+/* Code blocks */
+.message pre {
+  background: #f5f5f5;          /* light background */
+  color: #333;                  /* dark text */
+  padding: 8px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.message pre code {
+  background: none;             /* remove double background */
+  color: inherit;
+}
+
+    /* Markdown styling for AI messages */
+    .message.ai h1,
+    .message.ai h2,
+    .message.ai h3 {
+      margin: 0.5em 0;
+    }
+
+    .message.ai pre {
+      background: #272822;
+      color: #f8f8f2;
+      padding: 0.5em;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+
+    .message.ai code {
+      background: #e8e8e8;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    .message.ai a {
+      color: #0366d6;
+      text-decoration: none;
+    }
+
+    .message.ai a:hover {
+      text-decoration: underline;
+    }
+
+    .message.ai ul {
+      list-style-type: disc;
+      margin: 0.5em 0;
+      padding-left: 1.5em;
+    }
+
+    .message.ai ul li {
+      margin-bottom: 0.25em;
+    }
+
+    .message.ai ol {
+      list-style-type: decimal;
+      margin: 0.5em 0;
+      padding-left: 1.5em;
+    }
+
+    .message.ai ol li {
+      margin-bottom: 0.25em;
+    }
+
+    /* Typing indicator animation */
+    .typing {
+      display: flex;
+      align-items: center;
+      margin-top: 20px; /* adjust spacing as you like */
+    }
+    .typing span {
+      height: 8px;
+      width: 8px;
+      margin: 0 2px;
+      background: #555;
+      border-radius: 50%;
+      display: inline-block;
+      animation: blink 1.4s infinite both;
+    }
+    .typing span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .typing span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    @keyframes blink {
+      0% { opacity: 0.2; }
+      20% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+       <img class="logo" src="/images/logo.png" alt="Logo" />
+      AI Agent
+    </div>
+    <div id="chat" class="chat-messages"></div>
+    <div class="chat-input">
+      <input id="input" type="text" placeholder="Type a message…" autofocus />
+      <button id="send">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+
+    const conversation = [];
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    let typingDiv = null;
+    let typingInterval = null;
+    function showTypingIndicator() {
+      typingDiv = document.createElement('div');
+      typingDiv.classList.add('message', 'ai');
+      typingDiv.innerHTML = '<strong>Agent:</strong> <div class="typing"><span></span><span></span><span></span></div>';
+      chatEl.append(typingDiv);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      if (typingDiv) {
+        typingDiv.remove();
+        typingDiv = null;
+      }
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      conversation.push({ role: 'user', content: text });
+      appendMessage('You', text, 'user');
+
+      inputEl.value = '';
+      toggleInput(false);
+      showTypingIndicator();
+      const start = performance.now();
+
+      try {
+        // Always keep system message, then only last 5 exchanges
+     const limitedMessages = [
+            { role: 'system', content: 'You are a helpful assistant respond with useful markdown' },
+            ...conversation.slice(-5)
+          ];
+
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: limitedMessages })
+        });
+
+        const data = await res.json();
+        removeTypingIndicator();
+        //const elapsed = ((performance.now() - start) / 1000).toFixed(1); // seconds with 1 decimal
+
+        const llmElapsed = ((performance.now() - start) / 1000).toFixed(1);
+        if (data.error) {
+          appendMessage('Agent', data.error, 'ai');
+        } else {
+          const reply = data.response || '(no response)';
+          conversation.push({ role: 'assistant', content: reply });
+         // appendMessage(`Agent (${elapsed}s)`, reply, 'ai');  
+        streamMarkdownMessage('Agent', reply, 'ai', llmElapsed);
+        }
+      } catch (err) {
+        removeTypingIndicator();
+        appendMessage('Agent', 'Error contacting server.', 'ai');
+      } finally {
+        toggleInput(true);
+      }
+    }
+
+    function appendMessage(who, msg, cls) {
+      const div = document.createElement('div');
+      div.classList.add('message', cls);
+
+      const header = `<strong>${who}:</strong> `;
+      const body = marked.parse(msg);
+
+      const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      div.innerHTML = header + body + `<div style="font-size:0.75em;color:#888;">${time}</div>`;
+
+      chatEl.append(div);
+      chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+    }
+
+ 
+function streamMarkdownMessage(baseWho, msg, cls, llmElapsed) {
+  const div = document.createElement('div');
+  div.classList.add('message', cls);
+
+  div.innerHTML = `<strong>${baseWho}:</strong> <span class="typing-text"></span>`;
+  chatEl.append(div);
+
+  const target = div.querySelector('.typing-text');
+  const words = msg.split(' ');
+  let i = 0;
+
+  // Dynamic timing
+  const baseDuration = 800; // ms
+  const perWord = 80;       // ms per word
+  const maxDuration = 6000; // cap at 6s
+  const totalDuration = Math.min(baseDuration + words.length * perWord, maxDuration);
+  const delay = totalDuration / words.length;
+
+  function typeWord() {
+    if (i < words.length) {
+      const partial = words.slice(0, i + 1).join(' ');
+      target.innerHTML = marked.parse(partial);
+      i++;
+      chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+      setTimeout(typeWord, delay);
+    } else {
+      const body = marked.parse(msg);
+      const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      //div.innerHTML = `<strong>${baseWho} (${llmElapsed}s):</strong> ${body}<div style="font-size:0.75em;color:#888;">${time}</div>`;
+      div.innerHTML = `<strong>${baseWho}:</strong> ${body}<div style="font-size:0.75em;color:#888;">${time}</div>`;
+
+    }
+  }
+
+  typeWord();
+}
+
+
+
+async function sendHiddenMessage(prompt = 'hello') {
+  // Prime conversation without showing the user message
+  //conversation.push({ role: 'user', content: prompt });
+  
+  toggleInput(false); // 🔒 disable input while waiting
+  const start = performance.now();
+
+      const hiddenMessages = [
+      conversation[0], // system
+       { role: 'user', content: prompt }
+       ];
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: hiddenMessages }) 
+    });
+
+    const data = await res.json();
+    const llmElapsed = ((performance.now() - start) / 1000).toFixed(1);
+
+   if (data.error) {
+      streamMarkdownMessage('Agent', data.error, 'ai', '—');
+    } else {
+      const reply = data.response || '(no response)';
+     // conversation.push({ role: 'assistant', content: reply });
+      streamMarkdownMessage('Agent', reply, 'ai', llmElapsed);
+    }
+  } catch (err) {
+    streamMarkdownMessage('Agent', 'Error contacting server.', 'ai', '—');
+  } finally {
+    toggleInput(true); // 🔓 re‑enable input once reply arrives
+  }
+}
+
+
+
+
+    function toggleInput(enabled) {
+      inputEl.disabled = !enabled;
+      sendBtn.textContent = enabled ? 'Send' : '...';
+    }
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Optional: small delay to let the backend warm up
+  setTimeout(() => sendHiddenMessage('hello'), 150);
+});
+
+  </script>
+</body>
+</html>

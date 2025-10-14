@@ -1,0 +1,10 @@
+{
+  "name": "ai-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "volcano-sdk": "^1.0.0"
+  }
+}
