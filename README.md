@@ -1,10 +1,11 @@
 # AI Agent
 
-A minimal web chat app with:
+An AI Agent implemented using Node.js and Kong's Volcano SDK:
 - Clean chat UI (vanilla HTML/CSS/JS)
 - Markdown rendering (marked)
 - “Typing” animation while waiting for a reply
 - Express server that serves the client and proxies chat requests
+- Streams response from the LLM
 - Dockerfile for containerized deployment
 
 ## Overview
