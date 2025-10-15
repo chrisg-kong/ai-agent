@@ -7,6 +7,7 @@ An AI Agent implemented using Node.js and Kong's Volcano SDK:
 - Express server that serves the client and proxies chat requests
 - Streams response from the LLM
 - Dockerfile for containerized deployment
+- docker-compose file
 
 ## Overview
 
@@ -21,8 +22,10 @@ Directory layout:
 ```
 ai-agent/
 ├─ Dockerfile
+├─ docker-compose.yml
 ├─ package.json
 ├─ server.js
+├─ .env.example
 └─ public/
    ├─ index.html
    └─ images/
