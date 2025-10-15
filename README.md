@@ -16,6 +16,7 @@ An AI Agent implemented using Node.js and Kong's Volcano SDK:
   - Includes only the last few user/assistant turns to keep prompts short
   - POSTs to `/api/chat` with `{ messages: [...] }`
 - Backend (server.js) is the Node/Express entrypoint. It serves `public/` and exposes `/api/chat`.
+- Streams responses from the AI Gateway
 - Dependencies include `express` and `volcano-sdk` (see server.js for how the model/provider is wired).
 
 Directory layout:
