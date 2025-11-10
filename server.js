@@ -10,25 +10,38 @@ app.use(express.json());
 
 
 // Environment variables with sensible defaults
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'Chris';
-const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'http://host.docker.internal:8000/1';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-const MCP_SERVICE_NAMES = (process.env.MCP_SERVICE_NAMES || 'vehicles,weather').split(',').map(s => s.trim()).filter(Boolean);
-const MCP_BASE_URL = process.env.MCP_BASE_URL || 'http://host.docker.internal:8000';
+const KONG_API_KEY = process.env.KONG_API_KEY;
+const KONG_BASE_URL = process.env.KONG_BASE_URL;
+const KONG_MODEL = process.env.KONG_MODEL;
+const MCP_SERVICE_NAMES = (process.env.MCP_SERVICE_NAMES).split(',').map(s => s.trim()).filter(Boolean);
+const MCP_BASE_URL = process.env.MCP_BASE_URL;
+
+console.log('=== Configuration ===');
+console.log('API Key:', KONG_API_KEY ? `${KONG_API_KEY.substring(0, 20)}...` : 'NOT SET');
+console.log('Base URL:', KONG_BASE_URL);
+console.log('Model:', KONG_MODEL);
+console.log('MCP Services:', MCP_SERVICE_NAMES);
+console.log('MCP Base URL:', MCP_BASE_URL);
+console.log('====================');
 
 // Create OpenAI provider
-const openai = llmOpenAI({
-  apiKey: OPENAI_API_KEY,
-  baseURL: OPENAI_BASE_URL,
-  model: OPENAI_MODEL,
+const kongProvider = llmOpenAI({
+  apiKey: KONG_API_KEY,
+  baseURL: KONG_BASE_URL,
+  model: KONG_MODEL,
 });
 
 // MCP services
 const mcps = MCP_SERVICE_NAMES.map(name =>
-  mcp(`${MCP_BASE_URL}/${name}`)
+  mcp(`${MCP_BASE_URL}/${name}`, {
+    auth: {
+      type: "bearer",
+      token: KONG_API_KEY,
+    },
+  })
 );
 
-// --- Express route ---
+// --- Express route with Volcano streaming ---
 app.post('/api/chat', async (req, res) => {
   try {
     const allMessages = req.body.messages || [];
@@ -37,46 +50,42 @@ app.post('/api/chat', async (req, res) => {
     // Regex to detect MCP key words (case‑insensitive)
     const needsMcp = /\b(fetch|list|retrieve|weather)\b/i.test(lastUserMsg);
     
-    // Set headers for Server-Sent Events
-    res.setHeader('Content-Type', 'text/event-stream');
+    // Set headers for streaming text
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-
-    const volcanoAgent = agent({ llm: openai });
+    
+    const volcanoAgent = agent({ llm: kongProvider });
     
     const config = {
       prompt: JSON.stringify(allMessages, null, 2),
       ...(needsMcp && { mcps })
     };
     
+    // Use Volcano's .stream() method
     const stream = await volcanoAgent.then(config).stream();
-    
-    let fullResponse = '';
-    let chunkCount = 0;
     
     console.log('--- Starting stream ---');
     
+    let chunkCount = 0;
+    let totalChars = 0;
+    
     for await (const chunk of stream) {
-      console.log(`Chunk ${++chunkCount}:`, chunk);
+      console.log(`Chunk ${++chunkCount}:`, JSON.stringify(chunk));
       
       if (chunk.llmOutput) {
-        fullResponse += chunk.llmOutput;
-        // Send the chunk to the client
-        res.write(`data: ${JSON.stringify({ chunk: chunk.llmOutput, done: false })}\n\n`);
+        totalChars += chunk.llmOutput.length;
+        // Send just the text content directly
+        res.write(chunk.llmOutput);
       }
     }
     
-    console.log('--- Stream complete ---');
-    console.log('Full response length:', fullResponse.length);
-    
-    // Send final message
-    res.write(`data: ${JSON.stringify({ chunk: '', done: true, fullResponse })}\n\n`);
+    console.log(`--- Stream complete --- (${chunkCount} chunks, ${totalChars} chars)`);
     res.end();
     
   } catch (err) {
     console.error('Volcano agent error:', err);
 
-    // For streaming errors, send error as SSE
     const errorMessage = (() => {
       if (err.status === 429 || err.cause?.status === 429) {
         return 'Rate limit has been hit. Please wait a few seconds and try again.';
@@ -87,7 +96,7 @@ app.post('/api/chat', async (req, res) => {
       return 'Sorry I am unable to help right now, please ask me something else';
     })();
     
-    res.write(`data: ${JSON.stringify({ error: errorMessage, done: true })}\n\n`);
+    res.write(errorMessage);
     res.end();
   }
 });
